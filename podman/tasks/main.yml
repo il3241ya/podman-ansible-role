@@ -57,3 +57,12 @@
         group: "{{ rootless_user }}"
         mode: '0644'
         remote_src: true
+  rescue:
+    - name: Log failure during Podman Install
+      ansible.builtin.debug:
+        msg: "Podman installation failed. Please check the error logs."
+
+  always:
+    - name: Ensure cleanup after Podman Install block
+      ansible.builtin.debug:
+        msg: "Completed execution of Podman Install block."
