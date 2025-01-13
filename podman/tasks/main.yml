@@ -1,0 +1,59 @@
+---
+- name: Podman Install
+  block:
+    - name: Update apt repository
+      ansible.builtin.apt:
+        update_cache: true
+      become: true
+
+    - name: Install required packages
+      ansible.builtin.apt:
+        name:
+          - podman
+          - passt  # Podman also supports slirp4netns
+      become: true
+
+    - name: Ensure /etc/subuid and /etc/subgid are configured for rootless user
+      ansible.builtin.lineinfile:
+        path: "/etc/subuid"
+        line: "{{ rootless_user }}:100000:65536"
+        state: present
+      become: true
+
+    - name: Ensure /etc/subgid is configured for rootless user
+      ansible.builtin.lineinfile:
+        path: "/etc/subgid"
+        line: "{{ rootless_user }}:100000:65536"
+        state: present
+      become: true
+
+    - name: Add environment variables to .bashrc for rootless_user
+      ansible.builtin.lineinfile:
+        path: "/home/{{ rootless_user }}/.bashrc"
+        line: "{{ item }}" # Default values(for Podman) are currently selected
+        state: present
+      become_user: "{{ rootless_user }}"
+      become: true
+      with_items:
+        - 'export XDG_CONFIG_HOME="$HOME/.config"'
+        - 'export XDG_DATA_HOME="$HOME/.local/share"'
+        - 'export XDG_RUNTIME_DIR="/run/user/$UID"'
+
+    - name: Create Podman configuration directories for rootless_user
+      ansible.builtin.file:
+        path: "/home/{{ rootless_user }}/.config/containers"
+        state: directory
+        owner: "{{ rootless_user }}"
+        group: "{{ rootless_user }}"
+        mode: '0755'
+
+    # By default podman does not creat configs files for rootless environment
+    # https://github.com/containers/podman/blob/main/docs/tutorials/rootless_tutorial.md
+    - name: Copy default Podman configuration files for rootless_user
+      ansible.builtin.copy:
+        src: "/usr/share/containers/containers.conf"
+        dest: "/home/{{ rootless_user }}/.config/containers/containers.conf"
+        owner: "{{ rootless_user }}"
+        group: "{{ rootless_user }}"
+        mode: '0644'
+        remote_src: true
